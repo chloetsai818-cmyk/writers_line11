@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>作家群組聊天</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0e0c0a;color:#f0ebe3;font-family:'Lora',Georgia,serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes page-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes msg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dot-pulse{0%,80%,100%{opacity:0.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1)}}
+@keyframes pulse-gold{0%,100%{box-shadow:0 0 0 0 rgba(212,168,75,0.15)}50%{box-shadow:0 0 20px 6px rgba(212,168,75,0.15)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+.page{display:none;min-height:100vh;position:relative;animation:page-in 0.35s ease both}
+.page.active{display:block}
+.page-flex{display:none;flex-direction:column;height:100vh}
+.page-flex.active{display:flex}
+
+/* Nav */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(14,12,10,0.9);backdrop-filter:blur(16px);position:sticky;top:0;z-index:100}
+.nav-logo{display:flex;align-items:center;gap:0.5rem;font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:600;color:#d4a84b}
+.nav-spin{animation:spin-slow 8s linear infinite;display:inline-block}
+.mode-pill{font-family:system-ui,sans-serif;font-size:0.62rem;padding:0.15rem 0.55rem;border-radius:100px;border:1px solid;display:inline-block}
+
+/* Buttons */
+.btn-gold{display:inline-flex;align-items:center;gap:0.6rem;background:#d4a84b;color:#0e0c0a;font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;padding:0.85rem 2.25rem;border:none;border-radius:100px;cursor:pointer;transition:all 0.2s ease}
+.btn-gold:hover{background:#e6bc5a;transform:translateY(-2px);box-shadow:0 8px 28px rgba(212,168,75,0.35)}
+.btn-gold:disabled{background:#2a2218;color:#5c5347;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.1);color:#9e9080;font-family:system-ui,sans-serif;font-size:0.8rem;padding:0.4rem 0.9rem;border-radius:6px;cursor:pointer;transition:all 0.2s}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.2);color:#f0ebe3}
+.btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.12);color:#9e9080;font-family:system-ui,sans-serif;font-size:0.82rem;border-radius:8px;cursor:pointer;transition:all 0.2s;padding:0.55rem 1.1rem}
+.btn-outline:hover{border-color:rgba(212,168,75,0.4);color:#d4a84b;background:rgba(212,168,75,0.06)}
+.btn-send{background:#d4a84b;color:#0e0c0a;border:none;border-radius:8px;font-family:'Playfair Display',serif;font-size:0.82rem;font-weight:700;padding:0.5rem 1rem;cursor:pointer;transition:all 0.2s}
+.btn-send:disabled{background:#1e1a14;color:#3a3228;cursor:not-allowed}
+
+/* Cards */
+.card-surface{background:#1a1714;border:1px solid rgba(255,255,255,0.07);border-radius:14px;transition:all 0.2s ease}
+.card-surface:hover{border-color:rgba(255,255,255,0.14);transform:translateY(-1px);cursor:pointer}
+.card-surface.selected{border-color:var(--accent)}
+
+/* Avatar */
+.avatar{border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;border:1.5px solid rgba(255,255,255,0.1)}
+.avatar svg{display:block;width:100%;height:100%}
+.avatar-initial{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-family:'Playfair Display',serif;font-weight:700}
+
+/* Messages */
+.msg-in{animation:msg-in 0.4s ease both}
+.msg-user{display:flex;flex-direction:column;align-items:flex-end;margin-bottom:1.25rem}
+.msg-writer{margin-bottom:1.25rem}
+.bubble-user{background:#2d2010;border:1px solid rgba(212,168,75,0.2);border-radius:14px 3px 14px 14px;padding:0.85rem 1.15rem;font-family:'Lora',serif;font-size:0.92rem;line-height:1.75;color:#f0dbb8;max-width:500px;position:relative;overflow:hidden}
+.bubble-user::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;background:#d4a84b;opacity:0.45}
+.bubble-writer{background:#1a1714;border:1px solid rgba(255,255,255,0.06);border-radius:3px 14px 14px 14px;padding:0.85rem 1.15rem;font-family:'Lora',serif;font-size:0.92rem;line-height:1.75;color:#e8e0d4;max-width:540px;position:relative;overflow:hidden;margin-left:48px}
+.bubble-writer::before{content:'';position:absolute;top:0;left:0;right:0;height:1.5px;opacity:0.45}
+.msg-header{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem}
+.msg-name{font-family:'Playfair Display',serif;font-size:0.88rem;font-weight:700}
+.msg-time{font-family:system-ui,sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.2);letter-spacing:0.04em}
+
+/* Typing indicator */
+.typing-dots{display:inline-flex;align-items:center;gap:5px;padding:0.75rem 1.15rem}
+.typing-dot{width:7px;height:7px;border-radius:50%}
+
+/* Divider */
+.chat-divider{display:flex;align-items:center;gap:0.75rem;margin:0.75rem 0 1.5rem;font-family:system-ui,sans-serif;font-size:0.65rem;letter-spacing:0.06em;color:rgba(255,255,255,0.18)}
+.chat-divider::before,.chat-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.05)}
+
+/* Inputs */
+textarea.chat-input{width:100%;background:#1a1510;border:1px solid rgba(212,168,75,0.25);border-radius:10px;color:#f0ebe3;font-family:'Lora',serif;font-size:0.88rem;font-style:italic;padding:0.65rem 1rem;resize:none;outline:none;line-height:1.5;transition:border-color 0.2s}
+textarea.chat-input:focus{border-color:rgba(212,168,75,0.6)}
+textarea.chat-input:disabled{background:#131110;border-color:rgba(255,255,255,0.04);color:#3a3228;cursor:not-allowed}
+textarea.topic-input{width:100%;background:#161310;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0ebe3;font-family:'Playfair Display',serif;font-size:1rem;font-style:italic;line-height:1.6;padding:1rem 1.25rem;resize:none;outline:none;transition:all 0.2s}
+textarea.topic-input:focus{border-color:#a07d32;box-shadow:0 0 0 3px rgba(212,168,75,0.1)}
+
+/* Chip */
+.chip{background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:100px;color:#9e9080;font-family:'Lora',serif;font-size:0.76rem;font-style:italic;padding:0.28rem 0.8rem;cursor:pointer;transition:all 0.2s}
+.chip:hover{border-color:#a07d32;color:#d4a84b;background:rgba(212,168,75,0.08)}
+
+/* Tag */
+.tag{font-family:system-ui,sans-serif;font-size:0.58rem;letter-spacing:0.06em;text-transform:uppercase;padding:0.15rem 0.45rem;border-radius:100px;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.28)}
+
+/* Modal overlay */
+.modal-overlay{position:fixed;inset:0;z-index:999;background:rgba(6,4,2,0.9);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:1.5rem;animation:fade-in 0.2s ease}
+.modal-box{background:#141210;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:2.5rem 2rem;max-width:520px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,0.6)}
+
+/* Paused banner */
+.paused-banner{display:flex;flex-direction:column;align-items:center;gap:0.75rem;padding:1.5rem 0 0.5rem;text-align:center}
+
+/* bg gradient */
+.bg-glow{position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 50% at 20% 10%,rgba(212,168,75,0.04) 0%,transparent 60%),radial-gradient(ellipse 60% 70% at 80% 90%,rgba(155,127,212,0.04) 0%,transparent 60%)}
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<!-- ═══ AVATAR PICKER MODAL ═══ -->
+<div id="avatar-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-family:system-ui,sans-serif;font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:#d4a84b;margin-bottom:0.75rem;opacity:0.8">歡迎來到文學書房</div>
+      <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:#f0ebe3;margin-bottom:0.5rem">選擇你的頭像</h2>
+      <p style="font-family:'Lora',serif;font-size:0.85rem;color:#9e9080;font-style:italic">在書房裡，你是誰？</p>
+    </div>
+    <div id="avatar-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.75rem"></div>
+    <div style="text-align:center;font-family:system-ui,sans-serif;font-size:0.7rem;color:rgba(255,255,255,0.2);font-style:italic">點擊任一頭像開始使用</div>
+  </div>
+</div>
+
+<!-- ═══ HOME PAGE ═══ -->
+<div id="page-home" class="page active">
+  <nav class="nav">
+    <div class="nav-logo"><span class="nav-spin">✦</span> Writer Group Chat</div>
+    <div style="font-family:system-ui,sans-serif;font-size:0.68rem;color:rgba(255,255,255,0.25);letter-spacing:0.1em;text-transform:uppercase">An AI Literary Salon</div>
+  </nav>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem 3rem;position:relative;z-index:1">
+    <div style="font-family:system-ui,sans-serif;font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;color:#d4a84b;margin-bottom:1.25rem;opacity:0.85">A Literary Thought Experiment</div>
+    <h1 style="font-family:'Playfair Display',serif;font-size:clamp(2.2rem,5vw,3.6rem);font-weight:700;line-height:1.15;color:#f0ebe3;margin-bottom:1rem">把世界上的作家<br/><em style="font-style:italic;color:#d4a84b">拉進同一個群組。</em></h1>
+    <p style="font-family:'Lora',serif;font-size:0.95rem;color:#9e9080;max-width:400px;margin-bottom:2.5rem;line-height:1.8">單獨和一位作家聊天，或是建立群組讓他們一起討論。</p>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;max-width:680px">
+      <button onclick="selectMode('single')" style="display:flex;flex-direction:column;align-items:flex-start;gap:0.35rem;padding:1.25rem 1.5rem;background:#d4a84b;color:#0e0c0a;border:none;border-radius:14px;cursor:pointer;transition:all 0.2s;max-width:300px;width:100%;text-align:left" onmouseover="this.style.background='#e6bc5a';this.style.transform='translateY(-2px)'" onmouseout="this.style.background='#d4a84b';this.style.transform='translateY(0)'">
+        <div style="display:flex;align-items:center;gap:0.6rem"><span>✦</span><span style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700">和一位作家聊天</span></div>
+        <div style="font-family:'Lora',serif;font-size:0.78rem;font-style:italic;opacity:0.75">選擇一位作家，向他提問，或展開一段對話。</div>
+      </button>
+      <button onclick="selectMode('group')" style="display:flex;flex-direction:column;align-items:flex-start;gap:0.35rem;padding:1.25rem 1.5rem;background:transparent;color:#f0ebe3;border:1px solid rgba(255,255,255,0.15);border-radius:14px;cursor:pointer;transition:all 0.2s;max-width:300px;width:100%;text-align:left" onmouseover="this.style.borderColor='rgba(255,255,255,0.35)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)';this.style.transform='translateY(0)'">
+        <div style="display:flex;align-items:center;gap:0.6rem"><span>⊞</span><span style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700">建立作家群組</span></div>
+        <div style="font-family:'Lora',serif;font-size:0.78rem;font-style:italic;opacity:0.65">選擇 2–4 位作家，輸入話題，讓他們討論。</div>
+      </button>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:2rem 1.5rem 3.5rem;position:relative;z-index:1">
+    <div style="font-family:system-ui,sans-serif;font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.2)">今日在線</div>
+    <div id="home-writers-row" style="display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center"></div>
+  </div>
+</div>
+
+<!-- ═══ SETUP PAGE ═══ -->
+<div id="page-setup" class="page" style="min-height:100vh">
+  <nav class="nav">
+    <div class="nav-logo"><span class="nav-spin">✦</span> Writer Group Chat</div>
+    <div style="display:flex;align-items:center;gap:0.5rem">
+      <span id="setup-mode-pill" class="mode-pill"></span>
+      <button class="btn-ghost" onclick="showPage('home')">← 返回</button>
+    </div>
+  </nav>
+  <div style="max-width:820px;margin:0 auto;padding:2.5rem 1.5rem 6rem;display:flex;flex-direction:column;gap:2.5rem;position:relative;z-index:1">
+
+    <!-- Step 1 -->
+    <section>
+      <div style="font-family:system-ui,sans-serif;font-size:0.68rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#d4a84b;display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem">Step 01 <span style="flex:1;height:1px;background:rgba(255,255,255,0.06);max-width:40px"></span></div>
+      <h2 id="setup-title" style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:#f0ebe3;margin-bottom:0.5rem"></h2>
+      <p id="setup-desc" style="color:#9e9080;font-size:0.88rem;margin-bottom:1.25rem"></p>
+      <div id="preset-section" style="display:none;margin-bottom:1rem">
+        <div style="font-family:system-ui,sans-serif;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:0.6rem">推薦組合</div>
+        <div id="preset-buttons" style="display:flex;gap:0.6rem;flex-wrap:wrap"></div>
+      </div>
+      <div id="writer-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.75rem"></div>
+      <div style="margin-top:0.75rem;font-family:system-ui,sans-serif;font-size:0.8rem;color:#9e9080">
+        已選擇 <span id="selected-count" style="color:#d4a84b;font-weight:600">0</span> 位作家
+        <span id="select-hint-text" style="color:rgba(255,255,255,0.2);font-size:0.73rem"></span>
+      </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section>
+      <div style="font-family:system-ui,sans-serif;font-size:0.68rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#d4a84b;display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem">Step 02 <span style="flex:1;height:1px;background:rgba(255,255,255,0.06);max-width:40px"></span></div>
+      <h2 id="input-title" style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:#f0ebe3;margin-bottom:0.5rem"></h2>
+      <p id="input-desc" style="color:#9e9080;font-size:0.88rem;margin-bottom:1rem"></p>
+      <div style="position:relative;margin-bottom:1rem">
+        <textarea id="topic-input" class="topic-input" rows="3" maxlength="200"></textarea>
+        <div id="char-count" style="position:absolute;bottom:0.6rem;right:0.9rem;font-family:system-ui,sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.2)">0 / 200</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.6rem">
+        <div style="font-family:system-ui,sans-serif;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.2)">需要靈感？</div>
+        <div id="topic-chips" style="display:flex;flex-wrap:wrap;gap:0.45rem"></div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0.7rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.06)">
+      <button id="start-btn" class="btn-gold" disabled onclick="startChat()">
+        <span id="start-btn-text"></span><span id="start-btn-icon" style="display:inline-block">✦</span>
+      </button>
+      <div id="cta-hint" style="font-family:system-ui,sans-serif;font-size:0.73rem;color:rgba(255,255,255,0.25)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CHAT PAGE ═══ -->
+<div id="page-chat" class="page-flex">
+  <nav class="nav" style="flex-shrink:0">
+    <button class="btn-ghost" onclick="showPage('setup')" id="chat-back-btn" style="font-size:0.78rem;padding:0.35rem 0.8rem;flex-shrink:0"></button>
+    <div style="flex:1;text-align:center;min-width:0">
+      <div id="chat-nav-title" style="font-family:'Playfair Display',serif;font-size:0.88rem;font-weight:600;color:#f0ebe3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <div id="chat-nav-sub" style="font-family:system-ui,sans-serif;font-size:0.63rem;color:rgba(255,255,255,0.22);letter-spacing:0.04em;margin-top:0.1rem"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0">
+      <span id="chat-mode-pill" class="mode-pill"></span>
+      <div id="chat-status" style="display:flex;align-items:center;gap:0.4rem;font-family:system-ui,sans-serif;font-size:0.68rem"></div>
+    </div>
+  </nav>
+
+  <!-- Chat sub-header -->
+  <div id="chat-header" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.05);background:#141210;flex-shrink:0;position:relative;z-index:1"></div>
+
+  <!-- Messages -->
+  <div id="chat-messages" style="flex:1;overflow-y:auto;padding:1.5rem 1.75rem 1rem;max-width:760px;margin:0 auto;width:100%;position:relative;z-index:1"></div>
+
+  <!-- Footer -->
+  <div style="flex-shrink:0;border-top:1px solid rgba(255,255,255,0.06);background:rgba(10,8,6,0.94);backdrop-filter:blur(12px);position:relative;z-index:50">
+    <div style="max-width:760px;margin:0 auto;padding:0.85rem 1.5rem;display:flex;flex-direction:column;gap:0.6rem">
+      <div id="user-input-area" style="display:none;flex;gap:0.6rem;align-items:flex-end">
+        <textarea id="user-input" class="chat-input" rows="2" placeholder="說點什麼……（Enter 送出）"></textarea>
+        <div style="display:flex;flex-direction:column;gap:0.4rem">
+          <button class="btn-send" id="send-btn" onclick="sendUserMessage()">送出</button>
+          <button id="cancel-input-btn" class="btn-outline" style="font-size:0.75rem;padding:0.4rem 0.7rem;display:none" onclick="cancelInput()">取消</button>
+        </div>
+      </div>
+      <div id="footer-action-row" style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
+        <div id="auto-count-label" style="font-family:system-ui,sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.18);font-style:italic"></div>
+        <button id="speak-btn" class="btn-outline" style="border-color:rgba(212,168,75,0.3);color:#d4a84b;display:none" onclick="handleWantsToSpeak()">✎ 我要說話</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+
+const WRITERS = {
+  shakespeare:{id:"shakespeare",name:"莎士比亞",fullName:"William Shakespeare",era:"1564–1616 · 英國",desc:"戲劇性十足，痴迷命運與人性，金句信手拈來。",tags:["悲劇","命運","人性"],bg:"#2a1f3d",accent:"#9b7fd4",initial:"莎",persona:`你是莎士比亞（William Shakespeare），文藝復興時期的劇作家與詩人。用繁體中文回覆，偶爾夾一句英文原文再自己翻譯。你的語氣充滿戲劇張力，喜歡用命運、愛情、死亡來打比喻。偶爾引用自己的作品，例如「To be, or not to be——這才是真正的問題。」但要自然融入對話，不是在背書。說話像在群組聊天：簡短有力，1-2句為主，最多3句。不要長篇大論。`},
+  hemingway:{id:"hemingway",name:"海明威",fullName:"Ernest Hemingway",era:"1899–1961 · 美國",desc:"極簡、直接、不說廢話。冰山下面才是重點。",tags:["極簡主義","戰爭","硬漢"],bg:"#1f2d1e",accent:"#7eb87e",initial:"海",persona:`你是海明威（Ernest Hemingway），美國小說家。用繁體中文回覆，偶爾夾一句英文。你說話極度簡短。一句話能說清楚就不說兩句。不用形容詞堆砌。你相信真相比什麼都重要，不喜歡抽象的廢話。聊天訊息就是1-2句，絕對不超過3句。`},
+  murakami:{id:"murakami",name:"村上春樹",fullName:"Haruki Murakami",era:"1949– · 日本",desc:"夢幻、孤獨、爵士樂和貓。平凡裡藏著超現實。",tags:["魔幻寫實","孤獨","音樂"],bg:"#1e2835",accent:"#6eb0d4",initial:"村",persona:`你是村上春樹（Haruki Murakami），日本小說家。用繁體中文回覆，偶爾夾日文片假名或英文歌名。你語氣安靜、有點憂鬱，說話常常飄到奇怪的地方——爵士樂、貓、意麵、深夜的便利商店。1-2句，最多3句。說話要有點飄。`},
+  jinyong:{id:"jinyong",name:"金庸",fullName:"金庸 Jin Yong",era:"1924–2018 · 中國",desc:"俠義、江湖、人性的善惡之間。每個人都有自己的道。",tags:["武俠","俠義","人性"],bg:"#2d1a1a",accent:"#d47070",initial:"金",persona:`你是金庸，武俠小說大師。用繁體中文回覆。你說話有古典韻味但不難懂，喜歡從江湖恩怨或武學道理引申到人生哲學。1-2句，最多3句。`},
+  luxun:{id:"luxun",name:"魯迅",fullName:"魯迅 Lu Xun",era:"1881–1936 · 中國",desc:"筆鋒如刀，諷刺入骨。哀其不幸，怒其不爭。",tags:["諷刺","批判","啟蒙"],bg:"#1e1a10",accent:"#c9a84c",initial:"魯",persona:`你是魯迅，中國現代文學之父。用繁體中文回覆。你說話犀利、帶刺，習慣用反諷揭露人性的醜陋和社會的荒謬。偶爾引用「從來如此，便對嗎？」之類的名言，自然融入對話。1-2句，最多3句。語氣冷峻，帶點黑色幽默。`},
+  zhangailing:{id:"zhangailing",name:"張愛玲",fullName:"張愛玲 Eileen Chang",era:"1920–1995 · 中國／台灣",desc:"人性幽微，愛恨細膩。出名要趁早，因為來不及。",tags:["愛情","細膩","蒼涼"],bg:"#2a1a28",accent:"#c97fb0",initial:"張",persona:`你是張愛玲，民國時期最重要的女作家之一。用繁體中文回覆。你說話細膩、有點涼薄，對人性和愛情的觀察精準得讓人心驚。語氣帶著一種優雅的距離感。1-2句，最多3句。`},
+  sanmao:{id:"sanmao",name:"三毛",fullName:"三毛 Echo",era:"1943–1991 · 台灣",desc:"流浪是我的命，愛是我的信仰。撒哈拉的風還在吹。",tags:["流浪","愛情","自由"],bg:"#1e2018",accent:"#a8c47e",initial:"三",persona:`你是三毛，台灣作家，一生流浪四方。用繁體中文回覆。你說話真情流露，熱愛自由，對生命充滿好奇與浪漫。語氣溫暖但有時帶點憂傷，像在和老朋友說心裡話。1-2句，最多3句。`},
+  yuhua:{id:"yuhua",name:"余華",fullName:"余華 Yu Hua",era:"1960– · 中國",desc:"活著就是最大的事。荒誕背後是比什麼都真實的殘酷。",tags:["荒誕","苦難","黑色幽默"],bg:"#201818",accent:"#e08c6e",initial:"余",persona:`你是余華，中國當代小說家，代表作《活著》。用繁體中文回覆。你說話帶著黑色幽默——表面平靜，甚至有點冷，但說的都是最殘酷的道理。1-2句，最多3句。語氣淡然，但回味無窮。`},
+  wilde:{id:"wilde",name:"王爾德",fullName:"Oscar Wilde",era:"1854–1900 · 愛爾蘭",desc:"毒舌是我的藝術，金句是我的武器。美麗比真實更重要。",tags:["機智","毒舌","唯美"],bg:"#1e1e2a",accent:"#a07fd4",initial:"王",persona:`你是奧斯卡·王爾德（Oscar Wilde），金句製造機。用繁體中文回覆，偶爾夾一句英文原話再翻譯。你說話機智、毒舌，總能把普通的觀點翻轉成驚人的金句。1-2句，最多3句。`},
+  kafka:{id:"kafka",name:"卡夫卡",fullName:"Franz Kafka",era:"1883–1924 · 波希米亞",desc:"一覺醒來變成蟲。荒謬不是比喻，是生活本身。",tags:["荒誕","存在焦慮","官僚"],bg:"#181820",accent:"#8888c0",initial:"卡",persona:`你是卡夫卡（Franz Kafka），存在主義文學的先驅。用繁體中文回覆。你說話帶著深沉的存在焦慮，覺得世界是一個巨大的不講道理的系統。1-2句，最多3句。語氣平靜，但讓人背脊發涼。`},
+};
+
+const WRITER_SVGS = {
+  shakespeare:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#2a1f3d"/><ellipse cx="40" cy="72" rx="20" ry="12" fill="#1e1530"/><path d="M26 60 Q33 56 40 58 Q47 56 54 60 L56 70 Q40 75 24 70Z" fill="#3d2a5c"/><path d="M32 59 Q36 56 40 57 Q44 56 48 59" stroke="#9b7fd4" stroke-width="1" fill="none" opacity="0.7"/><ellipse cx="40" cy="37" rx="15" ry="17" fill="#c9a87c"/><path d="M25 32 Q27 22 40 21 Q53 22 55 32 Q52 26 40 25 Q28 26 25 32Z" fill="#5c3d1e"/><path d="M25 32 Q22 38 23 46" fill="#4a2f10" stroke="#4a2f10" stroke-width="2"/><path d="M55 32 Q58 38 57 46" fill="#4a2f10" stroke="#4a2f10" stroke-width="2"/><ellipse cx="34" cy="37" rx="2.8" ry="2.5" fill="#f0dbb8"/><ellipse cx="46" cy="37" rx="2.8" ry="2.5" fill="#f0dbb8"/><circle cx="34.5" cy="37" r="1.4" fill="#2a1208"/><circle cx="46.5" cy="37" r="1.4" fill="#2a1208"/><circle cx="35" cy="36.4" r="0.5" fill="white" opacity="0.8"/><circle cx="47" cy="36.4" r="0.5" fill="white" opacity="0.8"/><path d="M35 44 Q37.5 45.5 40 44.5 Q42.5 45.5 45 44" stroke="#5c3d1e" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M36 47 Q40 50 44 47 Q42 52 40 53 Q38 52 36 47Z" fill="#5c3d1e" opacity="0.7"/></svg>`,
+  hemingway:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#1f2d1e"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#182415"/><path d="M25 62 L30 56 Q40 53 50 56 L55 62 L58 72 Q40 78 22 72Z" fill="#243d20"/><ellipse cx="40" cy="36" rx="16" ry="18" fill="#c4946a"/><path d="M24 30 Q26 20 40 19 Q54 20 56 30 Q52 24 40 23 Q28 24 24 30Z" fill="#d8d4d0"/><path d="M24 30 Q21 37 22 46" fill="#ccc8c4" stroke="#ccc8c4" stroke-width="2.5"/><path d="M56 30 Q59 37 58 46" fill="#ccc8c4" stroke="#ccc8c4" stroke-width="2.5"/><path d="M30 31 Q34 30 38 31" stroke="#907060" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M42 31 Q46 30 50 31" stroke="#907060" stroke-width="2.2" fill="none" stroke-linecap="round"/><ellipse cx="34" cy="36" rx="2.8" ry="2.5" fill="#f0dfc0"/><ellipse cx="46" cy="36" rx="2.8" ry="2.5" fill="#f0dfc0"/><circle cx="34.5" cy="36" r="1.5" fill="#1a1008"/><circle cx="46.5" cy="36" r="1.5" fill="#1a1008"/><circle cx="35" cy="35.4" r="0.5" fill="white" opacity="0.8"/><circle cx="47" cy="35.4" r="0.5" fill="white" opacity="0.8"/><path d="M27 45 Q29 53 32 57 Q40 62 48 57 Q51 53 53 45 Q46 50 40 50 Q34 50 27 45Z" fill="#e8e4e0"/><path d="M32 57 Q36 63 40 64 Q44 63 48 57" fill="#dedad6"/><path d="M33 43 Q36.5 46 40 45 Q43.5 46 47 43" stroke="#d8d4d0" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`,
+  murakami:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#1e2835"/><ellipse cx="40" cy="72" rx="21" ry="14" fill="#14202c"/><path d="M27 62 Q40 57 53 62 L56 72 Q40 78 24 72Z" fill="#1a2e42"/><ellipse cx="40" cy="36" rx="15" ry="17" fill="#d4a878"/><path d="M25 30 Q27 19 40 18 Q53 19 55 30 Q52 23 40 22 Q28 23 25 30Z" fill="#0e0804"/><rect x="25" y="22" width="30" height="9" rx="4" fill="#0e0804"/><path d="M25 30 Q22 37 23 44" fill="#0c0602" stroke="#0c0602" stroke-width="2"/><path d="M55 30 Q58 37 57 44" fill="#0c0602" stroke="#0c0602" stroke-width="2"/><circle cx="34" cy="36" r="5" fill="none" stroke="#6eb0d4" stroke-width="1.5"/><circle cx="46" cy="36" r="5" fill="none" stroke="#6eb0d4" stroke-width="1.5"/><line x1="39" y1="36" x2="41" y2="36" stroke="#6eb0d4" stroke-width="1.5"/><line x1="29" y1="35" x2="27" y2="34" stroke="#6eb0d4" stroke-width="1.5"/><line x1="51" y1="35" x2="53" y2="34" stroke="#6eb0d4" stroke-width="1.5"/><circle cx="34" cy="36" r="2" fill="#1a1008"/><circle cx="46" cy="36" r="2" fill="#1a1008"/><circle cx="34.6" cy="35.4" r="0.6" fill="white" opacity="0.7"/><circle cx="46.6" cy="35.4" r="0.6" fill="white" opacity="0.7"/><path d="M37 44 Q40 46 43 44" stroke="#a07858" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`,
+  jinyong:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#2d1a1a"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#1e0e0e"/><path d="M25 62 L29 54 Q40 51 51 54 L55 62 L58 72 Q40 80 22 72Z" fill="#3a1818"/><path d="M36 53 L40 51 L44 53" stroke="#d47070" stroke-width="1.5" fill="none" stroke-linecap="round"/><ellipse cx="40" cy="36" rx="15" ry="18" fill="#c49068"/><path d="M25 29 Q27 19 40 18 Q53 19 55 29 Q51 23 40 22 Q29 23 25 29Z" fill="#c8c4bc"/><path d="M25 29 Q22 37 23 46" fill="#c0bcb4" stroke="#c0bcb4" stroke-width="2"/><path d="M55 29 Q58 37 57 46" fill="#c0bcb4" stroke="#c0bcb4" stroke-width="2"/><path d="M30 36 Q34 34 38 36 Q34 39 30 36Z" fill="#f0dfc0"/><path d="M42 36 Q46 34 50 36 Q46 39 42 36Z" fill="#f0dfc0"/><ellipse cx="34" cy="36.5" rx="1.8" ry="1.5" fill="#1a0808"/><ellipse cx="46" cy="36.5" rx="1.8" ry="1.5" fill="#1a0808"/><path d="M35 43 Q37.5 45 40 44 Q42.5 45 45 43" stroke="#c4c0b8" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M37 47 Q40 51 43 47 Q41 56 40 58 Q39 56 37 47Z" fill="#d0ccc4"/><line x1="40" y1="58" x2="40" y2="64" stroke="#ccc8c0" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  luxun:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#1e1a10"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#141008"/><path d="M25 62 L30 55 Q40 52 50 55 L55 62 L58 72 Q40 78 22 72Z" fill="#1e1a0e"/><path d="M38 54 L40 52 L42 54 L42 66 L38 66Z" fill="#2a2414"/><ellipse cx="40" cy="36" rx="14" ry="17" fill="#c49a6c"/><path d="M26 28 Q28 18 40 17 Q52 18 54 28 Q50 21 40 20 Q30 21 26 28Z" fill="#0e0a04"/><rect x="26" y="20" width="28" height="10" rx="3" fill="#0e0a04"/><path d="M26 28 Q23 36 24 45" fill="#0c0802" stroke="#0c0802" stroke-width="2"/><path d="M54 28 Q57 36 56 45" fill="#0c0802" stroke="#0c0802" stroke-width="2"/><ellipse cx="34" cy="36" rx="3" ry="2.2" fill="#f0dfc0"/><ellipse cx="46" cy="36" rx="3" ry="2.2" fill="#f0dfc0"/><circle cx="34.5" cy="36" r="1.5" fill="#0a0604"/><circle cx="46.5" cy="36" r="1.5" fill="#0a0604"/><circle cx="35" cy="35.4" r="0.5" fill="white" opacity="0.9"/><circle cx="47" cy="35.4" r="0.5" fill="white" opacity="0.9"/><path d="M30 32 Q34 30 38 32" stroke="#403020" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M42 32 Q46 30 50 32" stroke="#403020" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M35 42 Q37 43.5 40 43 Q43 43.5 45 42" stroke="#2a1a08" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>`,
+  zhangailing:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#2a1a28"/><ellipse cx="40" cy="72" rx="21" ry="14" fill="#1e1020"/><path d="M26 62 L30 55 Q40 51 50 55 L54 62 L57 72 Q40 78 23 72Z" fill="#3a1840"/><path d="M36 53 Q40 50 44 53" stroke="#c97fb0" stroke-width="1.2" fill="none"/><ellipse cx="40" cy="35" rx="14" ry="17" fill="#d4a878"/><ellipse cx="40" cy="22" rx="13" ry="7" fill="#1a0e14"/><path d="M27 25 Q24 32 25 42" fill="#160a12" stroke="#160a12" stroke-width="1.5"/><path d="M53 25 Q56 32 55 42" fill="#160a12" stroke="#160a12" stroke-width="1.5"/><ellipse cx="40" cy="19" rx="6" ry="4" fill="#2a1820"/><path d="M30 34 Q34 32 38 34 Q34 37 30 34Z" fill="#f0dfc0"/><path d="M42 34 Q46 32 50 34 Q46 37 42 34Z" fill="#f0dfc0"/><ellipse cx="34" cy="34.5" rx="1.9" ry="1.6" fill="#0e0608"/><ellipse cx="46" cy="34.5" rx="1.9" ry="1.6" fill="#0e0608"/><circle cx="34.6" cy="33.8" r="0.55" fill="white" opacity="0.8"/><circle cx="46.6" cy="33.8" r="0.55" fill="white" opacity="0.8"/><path d="M36 41 Q38 43 40 42 Q42 43 44 41 Q42 44 40 44 Q38 44 36 41Z" fill="#c04060" opacity="0.8"/><circle cx="26" cy="37" r="2" fill="#f0e8e0" opacity="0.7"/></svg>`,
+  sanmao:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#1e2018"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#16180e"/><path d="M24 62 L29 54 Q40 50 51 54 L56 62 L59 72 Q40 79 21 72Z" fill="#2a3018"/><ellipse cx="40" cy="35" rx="15" ry="18" fill="#d4a878"/><path d="M25 28 Q27 17 40 16 Q53 17 55 28" fill="#2a1808"/><path d="M25 28 Q20 40 21 58 Q24 52 26 46 Q24 38 26 32" fill="#2a1808"/><path d="M55 28 Q60 40 59 58 Q56 52 54 46 Q56 38 54 32" fill="#2a1808"/><rect x="25" y="19" width="30" height="11" rx="5" fill="#2a1808"/><ellipse cx="34" cy="34" rx="2.8" ry="2.5" fill="#f0e0c0"/><ellipse cx="46" cy="34" rx="2.8" ry="2.5" fill="#f0e0c0"/><circle cx="34.5" cy="34" r="1.5" fill="#3a1808"/><circle cx="46.5" cy="34" r="1.5" fill="#3a1808"/><circle cx="35" cy="33.4" r="0.5" fill="white" opacity="0.9"/><circle cx="47" cy="33.4" r="0.5" fill="white" opacity="0.9"/><path d="M30 30 Q34 29 38 30" stroke="#4a2810" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M42 30 Q46 29 50 30" stroke="#4a2810" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M35 41 Q40 45 45 41" stroke="#a07050" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>`,
+  yuhua:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#201818"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#160e0e"/><path d="M25 62 L30 55 Q40 52 50 55 L55 62 L58 72 Q40 78 22 72Z" fill="#2a1818"/><path d="M38 53 L40 51 L42 53 L42 66 L38 66Z" fill="#1e1010"/><ellipse cx="40" cy="36" rx="15" ry="17" fill="#c49a6c"/><path d="M25 29 Q27 18 40 17 Q53 18 55 29 Q51 22 40 21 Q29 22 25 29Z" fill="#0e0804"/><rect x="25" y="20" width="30" height="10" rx="3" fill="#0e0804"/><path d="M25 29 Q22 37 23 46" fill="#0c0602" stroke="#0c0602" stroke-width="2"/><path d="M55 29 Q58 37 57 46" fill="#0c0602" stroke="#0c0602" stroke-width="2"/><ellipse cx="34" cy="36" rx="3" ry="2.2" fill="#f0dfc0"/><ellipse cx="46" cy="36" rx="3" ry="2.2" fill="#f0dfc0"/><circle cx="34.5" cy="36" r="1.5" fill="#1a0a04"/><circle cx="46.5" cy="36" r="1.5" fill="#1a0a04"/><path d="M30 32 Q34 31 38 32" stroke="#4a3020" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M42 32 Q46 31 50 32" stroke="#4a3020" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M36 43 Q40 44 44 43" stroke="#907040" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`,
+  wilde:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#1e1e2a"/><ellipse cx="40" cy="72" rx="22" ry="14" fill="#14141e"/><path d="M24 62 L29 54 Q40 50 51 54 L56 62 L59 72 Q40 79 21 72Z" fill="#28283c"/><path d="M35 53 L32 62 L40 58Z" fill="#1e1e30"/><path d="M45 53 L48 62 L40 58Z" fill="#1e1e30"/><ellipse cx="40" cy="35" rx="15" ry="18" fill="#d4b080"/><path d="M25 27 Q27 16 40 15 Q53 16 55 27" fill="#2a1a10"/><rect x="25" y="18" width="30" height="11" rx="5" fill="#2a1a10"/><path d="M25 27 Q21 38 22 50" fill="#241408" stroke="#241408" stroke-width="2.5"/><path d="M55 27 Q59 38 58 50" fill="#241408" stroke="#241408" stroke-width="2.5"/><path d="M29 34 Q33 31 38 33 Q33 37 29 34Z" fill="#f0e0c0"/><path d="M42 33 Q47 31 51 34 Q47 37 42 33Z" fill="#f0e0c0"/><ellipse cx="33.5" cy="34" rx="2" ry="1.7" fill="#1a0e06"/><ellipse cx="46.5" cy="33.5" rx="2" ry="1.7" fill="#1a0e06"/><path d="M28 30 Q33 28 37 30" stroke="#3a2010" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M43 29 Q47 27 51 29" stroke="#3a2010" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M39 35 Q37 40 40 42 Q43 40 41 35" stroke="#b09060" stroke-width="0.9" fill="none"/><path d="M35 45 Q39 47.5 44 45 Q41 48 40 48 Q39 48 35 45Z" fill="#a07050" opacity="0.6"/></svg>`,
+  kafka:`<svg viewBox="0 0 80 80" width="80" height="80" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="40" r="40" fill="#181820"/><ellipse cx="40" cy="72" rx="21" ry="13" fill="#10101a"/><path d="M26 62 L30 54 Q40 51 50 54 L54 62 L57 72 Q40 78 23 72Z" fill="#1c1c2c"/><ellipse cx="40" cy="35" rx="13" ry="18" fill="#c0a07a"/><path d="M27 27 Q29 17 40 16 Q51 17 53 27 Q49 21 40 20 Q31 21 27 27Z" fill="#080810"/><rect x="27" y="19" width="26" height="9" rx="3" fill="#080810"/><path d="M27 27 Q24 35 25 44" fill="#060610" stroke="#060610" stroke-width="1.8"/><path d="M53 27 Q56 35 55 44" fill="#060610" stroke="#060610" stroke-width="1.8"/><ellipse cx="34" cy="35" rx="3.5" ry="3" fill="#f0e8d8"/><ellipse cx="46" cy="35" rx="3.5" ry="3" fill="#f0e8d8"/><circle cx="34.5" cy="35" r="2" fill="#060608"/><circle cx="46.5" cy="35" r="2" fill="#060608"/><circle cx="35" cy="34.2" r="0.7" fill="white" opacity="0.9"/><circle cx="47" cy="34.2" r="0.7" fill="white" opacity="0.9"/><path d="M29 31 Q33 30 37 31" stroke="#303038" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M43 31 Q47 30 51 31" stroke="#303038" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M35 43 Q40 44 45 43" stroke="#907858" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`,
+};
+
+const USER_AVATARS = [
+  {id:"reader",label:"讀者",bg:"#1e2030",accent:"#8899dd",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#1e2030"/><rect x="14" y="20" width="22" height="28" rx="2" fill="#2a3050" stroke="#8899dd" stroke-width="1.2"/><rect x="18" y="16" width="22" height="28" rx="2" fill="#3a4060" stroke="#8899dd" stroke-width="1.2"/><line x1="22" y1="24" x2="36" y2="24" stroke="#8899dd" stroke-width="1" opacity="0.6"/><line x1="22" y1="28" x2="36" y2="28" stroke="#8899dd" stroke-width="1" opacity="0.6"/><line x1="22" y1="32" x2="30" y2="32" stroke="#8899dd" stroke-width="1" opacity="0.6"/><ellipse cx="42" cy="18" rx="3" ry="3.5" fill="#8899dd" opacity="0.8"/><path d="M38 24 Q42 26 46 24" stroke="#8899dd" stroke-width="1" fill="none"/></svg>`},
+  {id:"cat",label:"貓咪",bg:"#2a1e30",accent:"#cc88ee",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#2a1e30"/><path d="M20 24 L16 14 L24 22Z" fill="#cc88ee"/><path d="M40 24 L44 14 L36 22Z" fill="#cc88ee"/><ellipse cx="30" cy="30" rx="12" ry="13" fill="#cc88ee" opacity="0.7"/><ellipse cx="25" cy="28" rx="3" ry="4" fill="#1a1020"/><ellipse cx="35" cy="28" rx="3" ry="4" fill="#1a1020"/><circle cx="25.8" cy="27" r="1" fill="white" opacity="0.9"/><circle cx="35.8" cy="27" r="1" fill="white" opacity="0.9"/><path d="M27 33 Q30 35 33 33" stroke="#9966cc" stroke-width="1" fill="none" stroke-linecap="round"/></svg>`},
+  {id:"lamp",label:"檯燈",bg:"#2a2010",accent:"#d4a84b",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#2a2010"/><path d="M20 28 L30 12 L40 28Z" fill="#d4a84b" opacity="0.9"/><path d="M22 28 L38 28 L36 32 L24 32Z" fill="#b8902e"/><rect x="29" y="32" width="2" height="14" fill="#8a6820"/><ellipse cx="30" cy="47" rx="6" ry="2" fill="#6a5018"/></svg>`},
+  {id:"feather",label:"羽毛筆",bg:"#102018",accent:"#88cc99",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#102018"/><path d="M44 10 Q50 20 42 30 Q38 36 30 40 L26 50 L24 46 Q32 38 36 28 Q38 18 44 10Z" fill="#88cc99" opacity="0.8"/><path d="M44 10 Q36 16 34 26 Q32 34 26 42" stroke="#66aa77" stroke-width="1.2" fill="none"/><path d="M26 46 L24 52 L22 48Z" fill="#66aa77"/></svg>`},
+  {id:"moon",label:"月亮",bg:"#181828",accent:"#aaaaee",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#181828"/><path d="M38 14 Q22 18 20 30 Q18 44 32 48 Q16 46 14 30 Q12 14 28 10 Q34 9 38 14Z" fill="#aaaaee" opacity="0.85"/><circle cx="44" cy="16" r="1.5" fill="#aaaaee" opacity="0.4"/><circle cx="48" cy="28" r="1" fill="#aaaaee" opacity="0.3"/></svg>`},
+  {id:"compass",label:"指南針",bg:"#1a1010",accent:"#cc7766",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#1a1010"/><circle cx="30" cy="30" r="18" fill="none" stroke="#cc7766" stroke-width="1.5" opacity="0.6"/><circle cx="30" cy="30" r="16" fill="#221414" opacity="0.8"/><path d="M30 14 L33 28 L30 26 L27 28Z" fill="#cc7766"/><path d="M30 46 L27 32 L30 34 L33 32Z" fill="#887766"/><circle cx="30" cy="30" r="2.5" fill="#cc7766"/></svg>`},
+  {id:"ghost",label:"幽靈",bg:"#141c14",accent:"#99ccaa",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#141c14"/><path d="M18 42 Q18 22 30 18 Q42 22 42 42 Q39 38 36 42 Q33 38 30 42 Q27 38 24 42 Q21 38 18 42Z" fill="#99ccaa" opacity="0.75"/><ellipse cx="25" cy="32" rx="3" ry="3.5" fill="#141c14"/><ellipse cx="35" cy="32" rx="3" ry="3.5" fill="#141c14"/></svg>`},
+  {id:"hourglass",label:"沙漏",bg:"#1c1a10",accent:"#ccbb66",svg:`<svg viewBox="0 0 60 60" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#1c1a10"/><rect x="20" y="12" width="20" height="4" rx="2" fill="#ccbb66" opacity="0.8"/><rect x="20" y="44" width="20" height="4" rx="2" fill="#ccbb66" opacity="0.8"/><path d="M21 16 Q30 28 39 16Z" fill="#ccbb66" opacity="0.7"/><path d="M21 44 Q30 32 39 44Z" fill="#ccbb66" opacity="0.4"/><circle cx="30" cy="31" r="2" fill="#ccbb66" opacity="0.6"/></svg>`},
+];
+
+const TOPICS_GROUP = ["愛情是命運還是選擇？","人為什麼要旅行？","如果可以重來一次人生，你會選擇同樣的路嗎？","什麼是真正的英雄主義？","孤獨是人生的必要條件嗎？","文字的力量比刀劍更強大嗎？","現代人為什麼這麼焦慮？","什麼是真正的自由？","錢能買到幸福嗎？","死亡讓你更珍惜生命，還是更恐懼它？"];
+const TOPICS_SINGLE = ["你最近過得怎樣？","你對愛情有什麼看法？","你後悔過什麼事嗎？","你害怕死亡嗎？","孤獨對你來說是什麼感覺？","如果可以重來，你會改變什麼？","你覺得人生的意義是什麼？","什麼讓你真正快樂過？"];
+const GROUP_PRESETS = [
+  {label:"經典四人組",desc:"戲劇、硬派、孤獨與江湖。",writers:["shakespeare","hemingway","murakami","jinyong"]},
+  {label:"毒舌批判組",desc:"人性、社會、荒謬與愛情幻滅。",writers:["luxun","wilde","zhangailing","kafka"]},
+  {label:"人生苦難組",desc:"活著、自由、苦難與承擔。",writers:["yuhua","sanmao","jinyong","hemingway"]},
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let appState = {
+  page: "home",
+  mode: null,
+  selectedWriters: [],
+  topic: "",
+  userAvatar: null,
+  messages: [],
+  turnIndex: 0,
+  autoCount: 0,
+  paused: false,
+  isGenerating: false,
+  wantsToSpeak: false,
+  timer: null,
+};
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function makeAvatar(writerId, size) {
+  const w = WRITERS[writerId];
+  const div = document.createElement("div");
+  div.className = "avatar";
+  div.style.cssText = `width:${size}px;height:${size}px;min-width:${size}px;background:${w.bg};`;
+  div.innerHTML = WRITER_SVGS[writerId] || `<div class="avatar-initial" style="font-size:${size*0.38}px;color:${w.accent}">${w.initial}</div>`;
+  return div;
+}
+
+function makeUserAvatar(avatarId, size) {
+  const av = USER_AVATARS.find(a => a.id === avatarId) || USER_AVATARS[0];
+  const div = document.createElement("div");
+  div.className = "avatar";
+  div.style.cssText = `width:${size}px;height:${size}px;min-width:${size}px;background:${av.bg};border-color:${av.accent}55;`;
+  div.innerHTML = av.svg;
+  return div;
+}
+
+function getTime() {
+  return new Date().toLocaleTimeString("zh-TW", {hour:"2-digit",minute:"2-digit",hour12:false});
+}
+
+// ═══════════════════════════════════════════
+// PAGES
+// ═══════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll(".page,.page-flex").forEach(p => p.classList.remove("active"));
+  const el = document.getElementById("page-" + name);
+  if (el) el.classList.add("active");
+  appState.page = name;
+  window.scrollTo({top:0,behavior:"instant"});
+}
+
+function selectMode(mode) {
+  appState.mode = mode;
+  appState.selectedWriters = [];
+  appState.topic = "";
+  initSetupPage(mode);
+  showPage("setup");
+}
+
+// ═══════════════════════════════════════════
+// AVATAR PICKER
+// ═══════════════════════════════════════════
+function initAvatarPicker() {
+  const grid = document.getElementById("avatar-grid");
+  USER_AVATARS.forEach(av => {
+    const cell = document.createElement("div");
+    cell.style.cssText = `display:flex;flex-direction:column;align-items:center;gap:0.5rem;cursor:pointer;padding:0.75rem 0.5rem;border-radius:12px;border:1px solid rgba(255,255,255,0.06);transition:all 0.18s ease`;
+    const avatarDiv = makeUserAvatar(av.id, 52);
+    const label = document.createElement("span");
+    label.textContent = av.label;
+    label.style.cssText = `font-family:system-ui,sans-serif;font-size:0.68rem;color:rgba(255,255,255,0.35);letter-spacing:0.04em;transition:color 0.18s`;
+    cell.appendChild(avatarDiv);
+    cell.appendChild(label);
+    cell.onmouseenter = () => { cell.style.borderColor = av.accent; cell.style.background = av.bg + "99"; label.style.color = av.accent; };
+    cell.onmouseleave = () => { cell.style.borderColor = "rgba(255,255,255,0.06)"; cell.style.background = "transparent"; label.style.color = "rgba(255,255,255,0.35)"; };
+    cell.onclick = () => {
+      appState.userAvatar = av.id;
+      document.getElementById("avatar-modal").style.display = "none";
+    };
+    grid.appendChild(cell);
+  });
+}
+
+// ═══════════════════════════════════════════
+// HOME PAGE
+// ═══════════════════════════════════════════
+function initHomePage() {
+  const row = document.getElementById("home-writers-row");
+  Object.values(WRITERS).forEach(w => {
+    const col = document.createElement("div");
+    col.style.cssText = `display:flex;flex-direction:column;align-items:center;gap:0.4rem;cursor:pointer;transition:transform 0.2s`;
+    col.onmouseenter = () => col.style.transform = "translateY(-4px)";
+    col.onmouseleave = () => col.style.transform = "translateY(0)";
+    col.onclick = () => selectMode("single");
+    const av = makeAvatar(w.id, 44);
+    const name = document.createElement("div");
+    name.textContent = w.name;
+    name.style.cssText = `font-family:system-ui,sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.35)`;
+    col.appendChild(av);
+    col.appendChild(name);
+    row.appendChild(col);
+  });
+}
+
+// ═══════════════════════════════════════════
+// SETUP PAGE
+// ═══════════════════════════════════════════
+function initSetupPage(mode) {
+  const isSingle = mode === "single";
+  document.getElementById("setup-mode-pill").textContent = isSingle ? "單聊" : "群聊";
+  document.getElementById("setup-mode-pill").style.cssText = `border-color:${isSingle ? "rgba(212,168,75,0.4)" : "rgba(110,176,212,0.4)"};color:${isSingle ? "#d4a84b" : "#6eb0d4"}`;
+  document.getElementById("setup-title").textContent = isSingle ? "選擇你想對話的作家" : "選擇你的作家陣容";
+  document.getElementById("setup-desc").textContent = isSingle ? "選擇一位作家，向他提問或開啟一段對話。" : "選擇 2 到 4 位作家，他們將在群聊中分享彼此的觀點。";
+  document.getElementById("select-hint-text").textContent = isSingle ? "" : "（最少 2 位，最多 4 位）";
+  document.getElementById("input-title").textContent = isSingle ? "你想說什麼？" : "給他們一個話題";
+  document.getElementById("input-desc").textContent = isSingle ? "輸入你的第一句話，作家會直接回應你。" : "輸入任何你想討論的話題——越深刻越有趣。";
+  document.getElementById("start-btn-text").textContent = isSingle ? "開始聊天" : "召喚群聊";
+
+  const topicInput = document.getElementById("topic-input");
+  topicInput.placeholder = isSingle ? "輸入你想對作家說的話……\n例如：你覺得孤獨是一件壞事嗎？" : "輸入討論話題……\n例如：愛情是命運還是選擇？";
+  topicInput.value = "";
+  document.getElementById("char-count").textContent = "0 / 200";
+
+  // Presets
+  const presetSection = document.getElementById("preset-section");
+  presetSection.style.display = isSingle ? "none" : "block";
+  if (!isSingle) {
+    const btns = document.getElementById("preset-buttons");
+    btns.innerHTML = "";
+    GROUP_PRESETS.forEach(p => {
+      const btn = document.createElement("button");
+      btn.style.cssText = `background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.5rem 0.9rem;cursor:pointer;transition:all 0.2s;text-align:left`;
+      btn.innerHTML = `<div style="font-family:system-ui,sans-serif;font-size:0.75rem;font-weight:600;color:#d4a84b">${p.label}</div><div style="font-family:'Lora',serif;font-size:0.7rem;color:#9e9080;font-style:italic;margin-top:0.2rem">${p.desc}</div>`;
+      btn.onmouseenter = () => { btn.style.borderColor = "rgba(212,168,75,0.4)"; btn.style.background = "rgba(212,168,75,0.06)"; };
+      btn.onmouseleave = () => { btn.style.borderColor = "rgba(255,255,255,0.1)"; btn.style.background = "transparent"; };
+      btn.onclick = () => { appState.selectedWriters = [...p.writers]; renderWriterGrid(); updateCTA(); };
+      btns.appendChild(btn);
+    });
+  }
+
+  // Topic chips
+  const chips = document.getElementById("topic-chips");
+  chips.innerHTML = "";
+  (isSingle ? TOPICS_SINGLE : TOPICS_GROUP).forEach(t => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.textContent = t;
+    chip.onclick = () => { topicInput.value = t; appState.topic = t; document.getElementById("char-count").textContent = `${t.length} / 200`; updateCTA(); };
+    chips.appendChild(chip);
+  });
+
+  renderWriterGrid();
+  updateCTA();
+}
+
+function renderWriterGrid() {
+  const grid = document.getElementById("writer-grid");
+  grid.innerHTML = "";
+  const isSingle = appState.mode === "single";
+  Object.values(WRITERS).forEach(w => {
+    const isSel = appState.selectedWriters.includes(w.id);
+    const card = document.createElement("div");
+    card.className = "card-surface";
+    card.style.cssText = `padding:1rem;display:flex;gap:0.9rem;position:relative;overflow:hidden;${isSel ? `border-color:${w.accent}` : ""}`;
+
+    // Top accent bar
+    if (isSel) {
+      const bar = document.createElement("div");
+      bar.style.cssText = `position:absolute;top:0;left:0;right:0;height:2px;background:${w.accent};opacity:0.6;border-radius:14px 14px 0 0`;
+      card.appendChild(bar);
+    }
+
+    // Checkmark
+    const chk = document.createElement("div");
+    chk.style.cssText = `position:absolute;top:0.65rem;right:0.65rem;width:20px;height:20px;border-radius:50%;background:${isSel ? w.accent : "transparent"};border:1px solid ${isSel ? w.accent : "rgba(255,255,255,0.1)"};display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:${isSel ? "#0e0c0a" : "transparent"};font-weight:700;transition:all 0.2s`;
+    chk.textContent = "✓";
+    card.appendChild(chk);
+
+    // Avatar
+    const av = makeAvatar(w.id, 54);
+    av.style.borderRadius = "10px";
+    card.appendChild(av);
+
+    // Body
+    const body = document.createElement("div");
+    body.style.cssText = `flex:1;min-width:0;display:flex;flex-direction:column;gap:0.2rem`;
+    body.innerHTML = `
+      <div style="font-family:system-ui,sans-serif;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.22)">${w.era}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:0.92rem;font-weight:700;color:#f0ebe3">${w.fullName}</div>
+      <div style="font-family:'Lora',serif;font-size:0.75rem;color:#9e9080;font-style:italic;line-height:1.45">${w.desc}</div>
+      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.15rem">${w.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>
+    `;
+    card.appendChild(body);
+
+    card.onclick = () => {
+      if (isSingle) {
+        appState.selectedWriters = [w.id];
+      } else {
+        if (appState.selectedWriters.includes(w.id)) {
+          appState.selectedWriters = appState.selectedWriters.filter(id => id !== w.id);
+        } else {
+          if (appState.selectedWriters.length >= 4) { card.style.animation = "shake 0.4s ease"; setTimeout(() => card.style.animation = "", 500); return; }
+          appState.selectedWriters.push(w.id);
+        }
+      }
+      renderWriterGrid();
+      updateCTA();
+    };
+    grid.appendChild(card);
+  });
+  document.getElementById("selected-count").textContent = appState.selectedWriters.length;
+}
+
+function updateCTA() {
+  const isSingle = appState.mode === "single";
+  const topic = document.getElementById("topic-input").value.trim();
+  appState.topic = topic;
+  const min = isSingle ? 1 : 2;
+  const hasW = appState.selectedWriters.length >= min;
+  const hasT = topic.length > 1;
+  const btn = document.getElementById("start-btn");
+  btn.disabled = !(hasW && hasT);
+  const hint = document.getElementById("cta-hint");
+  if (!hasW && !hasT) hint.textContent = isSingle ? "請選擇一位作家並輸入訊息" : "請先選擇至少 2 位作家並輸入話題";
+  else if (!hasW) hint.textContent = isSingle ? "請選擇一位作家" : `請再選擇 ${min - appState.selectedWriters.length} 位作家`;
+  else if (!hasT) hint.textContent = isSingle ? "請輸入你想對作家說的話" : "請輸入討論話題";
+  else hint.textContent = "準備好了！";
+}
+
+document.getElementById("topic-input").addEventListener("input", e => {
+  document.getElementById("char-count").textContent = `${e.target.value.length} / 200`;
+  updateCTA();
+});
+
+function startChat() {
+  if (appState.isGenerating) return;
+  appState.messages = [];
+  appState.turnIndex = 0;
+  appState.autoCount = 0;
+  appState.paused = false;
+  appState.wantsToSpeak = false;
+  clearTimeout(appState.timer);
+  initChatPage();
+  showPage("chat");
+}
+
+// ═══════════════════════════════════════════
+// CHAT PAGE
+// ═══════════════════════════════════════════
+function initChatPage() {
+  const isSingle = appState.mode === "single";
+  const writers = appState.selectedWriters;
+  const topic = appState.topic;
+
+  // Nav
+  document.getElementById("chat-back-btn").textContent = isSingle ? "← 換作家" : "← 換話題";
+  if (isSingle) {
+    document.getElementById("chat-nav-title").textContent = `與 ${WRITERS[writers[0]].name} 的對話`;
+    document.getElementById("chat-nav-sub").textContent = "";
+  } else {
+    document.getElementById("chat-nav-title").textContent = `「${topic}」`;
+    document.getElementById("chat-nav-sub").textContent = writers.map(id => WRITERS[id].name).join(" · ");
+  }
+  const modePill = document.getElementById("chat-mode-pill");
+  modePill.textContent = isSingle ? "單聊" : "群聊";
+  modePill.style.cssText = `border-color:${isSingle ? "rgba(212,168,75,0.35)" : "rgba(110,176,212,0.35)"};color:${isSingle ? "#d4a84b" : "#6eb0d4"}`;
+
+  // Sub-header
+  const header = document.getElementById("chat-header");
+  header.innerHTML = "";
+  if (isSingle) {
+    const w = WRITERS[writers[0]];
+    const av = makeAvatar(w.id, 52);
+    av.style.borderRadius = "10px";
+    header.appendChild(av);
+    header.innerHTML += `<div><div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#f0ebe3">${w.fullName}</div><div style="font-family:'Lora',serif;font-size:0.78rem;color:${w.accent};font-style:italic;margin-top:0.15rem">${w.desc}</div><div style="display:flex;align-items:center;gap:0.35rem;margin-top:0.3rem"><div style="width:6px;height:6px;border-radius:50%;background:#7eb87e;box-shadow:0 0 6px #7eb87e"></div><span style="font-family:system-ui,sans-serif;font-size:0.62rem;color:#7eb87e">在線</span></div></div>`;
+    header.firstChild.after(header.querySelector("div"));
+  } else {
+    const icon = document.createElement("div");
+    icon.style.cssText = `width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#2d2018,#1a1510);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#d4a84b;flex-shrink:0;animation:pulse-gold 3s ease-in-out infinite`;
+    icon.textContent = "✦";
+    header.appendChild(icon);
+    const info = document.createElement("div");
+    info.innerHTML = `<div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:#f0ebe3">文學書房</div><div style="font-family:'Lora',serif;font-size:0.8rem;color:#d4a84b;font-style:italic;margin-top:0.1rem">「${topic}」</div>`;
+    header.appendChild(info);
+    const avRow = document.createElement("div");
+    avRow.style.cssText = "margin-left:auto;display:flex;gap:0.4rem";
+    writers.forEach(id => { const a = makeAvatar(id, 28); avRow.appendChild(a); });
+    header.appendChild(avRow);
+  }
+
+  // Messages area
+  const area = document.getElementById("chat-messages");
+  area.innerHTML = "";
+  addDivider(isSingle ? `與 ${WRITERS[writers[0]].name} 的對話開始了` : "文學書房的對話開始了");
+
+  // Footer
+  const inputArea = document.getElementById("user-input-area");
+  const footerRow = document.getElementById("footer-action-row");
+  const speakBtn = document.getElementById("speak-btn");
+  const cancelBtn = document.getElementById("cancel-input-btn");
+  document.getElementById("user-input").value = "";
+  document.getElementById("user-input").placeholder = isSingle ? "繼續說……（Enter 送出）" : "插話……（Enter 送出）";
+
+  if (isSingle) {
+    inputArea.style.display = "flex";
+    footerRow.style.display = "none";
+    speakBtn.style.display = "none";
+    cancelBtn.style.display = "none";
+  } else {
+    inputArea.style.display = "none";
+    footerRow.style.display = "flex";
+    speakBtn.style.display = "inline-flex";
+    cancelBtn.style.display = "none";
+    document.getElementById("auto-count-label").textContent = "0 / 10 則自動對話";
+  }
+
+  updateChatStatus();
+
+  // Kick off
+  if (isSingle) {
+    const firstMsg = {role:"user", message: topic};
+    appState.messages.push(firstMsg);
+    renderMessage(firstMsg);
+    setGenerating(true);
+    callAPI().then(msg => {
+      appendMessage(msg);
+      setGenerating(false);
+      setInputDisabled(false);
+    }).catch(err => { setGenerating(false); setInputDisabled(false); });
+  } else {
+    triggerNext();
+  }
+}
+
+function addDivider(text) {
+  const area = document.getElementById("chat-messages");
+  const div = document.createElement("div");
+  div.className = "chat-divider";
+  div.textContent = text;
+  area.appendChild(div);
+}
+
+function setGenerating(val) {
+  appState.isGenerating = val;
+  updateChatStatus();
+  const sendBtn = document.getElementById("send-btn");
+  const userInput = document.getElementById("user-input");
+  if (sendBtn) sendBtn.disabled = val || !userInput?.value?.trim();
+  if (appState.mode === "single") setInputDisabled(val);
+}
+
+function setInputDisabled(disabled) {
+  const input = document.getElementById("user-input");
+  if (!input) return;
+  input.disabled = disabled;
+  input.placeholder = disabled
+    ? `${WRITERS[appState.selectedWriters[0]]?.name} 正在回覆…`
+    : (appState.mode === "single" ? "繼續說……（Enter 送出）" : "插話……（Enter 送出）");
+}
+
+function updateChatStatus() {
+  const el = document.getElementById("chat-status");
+  if (!el || appState.mode !== "group") { if(el) el.innerHTML=""; return; }
+  const color = appState.paused ? "#d4a84b" : "#7eb87e";
+  const text = appState.paused ? "暫停" : appState.isGenerating ? "生成中" : "對話中";
+  el.innerHTML = `<div style="width:6px;height:6px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color}"></div><span style="color:${color};font-family:system-ui,sans-serif;font-size:0.68rem">${text}</span>`;
+}
+
+function renderMessage(msg) {
+  const area = document.getElementById("chat-messages");
+  const wrapper = document.createElement("div");
+  wrapper.className = "msg-in";
+  const time = getTime();
+
+  if (msg.role === "user") {
+    wrapper.className += " msg-user";
+    const header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem";
+    const timeEl = document.createElement("span");
+    timeEl.textContent = time;
+    timeEl.style.cssText = "font-family:system-ui,sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.2)";
+    const nameEl = document.createElement("span");
+    nameEl.textContent = "你";
+    nameEl.style.cssText = "font-family:'Playfair Display',serif;font-size:0.88rem;font-weight:700;color:#d4a84b";
+    const av = makeUserAvatar(appState.userAvatar, 36);
+    header.appendChild(timeEl);
+    header.appendChild(nameEl);
+    header.appendChild(av);
+    const bubble = document.createElement("div");
+    bubble.className = "bubble-user";
+    bubble.textContent = msg.message;
+    wrapper.appendChild(header);
+    wrapper.appendChild(bubble);
+  } else {
+    wrapper.className += " msg-writer";
+    const w = WRITERS[msg.writer];
+    if (!w) return;
+    const header = document.createElement("div");
+    header.className = "msg-header";
+    const av = makeAvatar(w.id, 36);
+    const nameEl = document.createElement("span");
+    nameEl.className = "msg-name";
+    nameEl.textContent = w.name;
+    nameEl.style.color = w.accent;
+    const timeEl = document.createElement("span");
+    timeEl.className = "msg-time";
+    timeEl.textContent = time;
+    header.appendChild(av);
+    header.appendChild(nameEl);
+    header.appendChild(timeEl);
+    const bubble = document.createElement("div");
+    bubble.className = "bubble-writer";
+    bubble.style.setProperty("--accent", w.accent);
+    bubble.style.cssText += `;--bar-color:${w.accent}`;
+    bubble.textContent = msg.message;
+    // accent bar via pseudo handled by CSS - add inline fallback
+    const bar = document.createElement("div");
+    bar.style.cssText = `position:absolute;top:0;left:0;right:0;height:1.5px;background:${w.accent};opacity:0.45`;
+    bubble.style.position = "relative";
+    bubble.style.overflow = "hidden";
+    bubble.insertBefore(bar, bubble.firstChild);
+    wrapper.appendChild(header);
+    wrapper.appendChild(bubble);
+  }
+  area.appendChild(wrapper);
+  area.scrollTop = area.scrollHeight;
+}
+
+function appendMessage(msg) {
+  appState.messages.push(msg);
+  renderMessage(msg);
+  removeTypingIndicator();
+}
+
+let typingIndicatorEl = null;
+function showTypingIndicator(writerId) {
+  removeTypingIndicator();
+  const w = WRITERS[writerId];
+  const area = document.getElementById("chat-messages");
+  const wrapper = document.createElement("div");
+  wrapper.id = "typing-indicator";
+  wrapper.className = "msg-in msg-writer";
+  const header = document.createElement("div");
+  header.className = "msg-header";
+  const av = makeAvatar(writerId, 36);
+  const nameEl = document.createElement("span");
+  nameEl.className = "msg-name";
+  nameEl.textContent = w.name;
+  nameEl.style.color = w.accent;
+  header.appendChild(av);
+  header.appendChild(nameEl);
+  const bubble = document.createElement("div");
+  bubble.className = "bubble-writer";
+  bubble.style.cssText = `margin-left:48px;position:relative;overflow:hidden`;
+  const bar = document.createElement("div");
+  bar.style.cssText = `position:absolute;top:0;left:0;right:0;height:1.5px;background:${w.accent};opacity:0.45`;
+  bubble.appendChild(bar);
+  const dots = document.createElement("div");
+  dots.className = "typing-dots";
+  [0,1,2].forEach(i => {
+    const d = document.createElement("div");
+    d.className = "typing-dot";
+    d.style.cssText = `background:${w.accent};animation:dot-pulse 1.4s ease-in-out ${i*0.22}s infinite`;
+    dots.appendChild(d);
+  });
+  bubble.appendChild(dots);
+  wrapper.appendChild(header);
+  wrapper.appendChild(bubble);
+  area.appendChild(wrapper);
+  typingIndicatorEl = wrapper;
+  area.scrollTop = area.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById("typing-indicator");
+  if (el) el.remove();
+  typingIndicatorEl = null;
+}
+
+// ═══════════════════════════════════════════
+// AUTO PLAY (GROUP)
+// ═══════════════════════════════════════════
+function scheduleNext() {
+  clearTimeout(appState.timer);
+  appState.timer = setTimeout(() => {
+    if (!appState.paused && !appState.isGenerating && !appState.wantsToSpeak) triggerNext();
+  }, 5000);
+}
+
+function triggerNext() {
+  if (appState.isGenerating) return;
+  const nextId = appState.selectedWriters[appState.turnIndex % appState.selectedWriters.length];
+  setGenerating(true);
+  showTypingIndicator(nextId);
+  callAPI(nextId).then(msg => {
+    appendMessage(msg);
+    appState.turnIndex++;
+    appState.autoCount++;
+    document.getElementById("auto-count-label").textContent = `${appState.autoCount} / 10 則自動對話`;
+    setGenerating(false);
+    if (appState.wantsToSpeak) {
+      showUserInputArea(true);
+      return;
+    }
+    if (appState.autoCount >= 10) {
+      appState.paused = true;
+      updateChatStatus();
+      showPausedBanner();
+    } else {
+      scheduleNext();
+    }
+  }).catch(() => { removeTypingIndicator(); setGenerating(false); scheduleNext(); });
+}
+
+function showPausedBanner() {
+  const area = document.getElementById("chat-messages");
+  const banner = document.createElement("div");
+  banner.className = "paused-banner";
+  banner.innerHTML = `
+    <div class="chat-divider" style="width:100%"><span>對話告一段落</span></div>
+    <button class="btn-outline" style="border-color:rgba(212,168,75,0.3);color:#d4a84b;padding:0.6rem 1.5rem" onclick="continueChat()">繼續對話 ✦</button>
+  `;
+  area.appendChild(banner);
+  area.scrollTop = area.scrollHeight;
+}
+
+function continueChat() {
+  appState.paused = false;
+  appState.autoCount = 0;
+  document.getElementById("auto-count-label").textContent = "0 / 10 則自動對話";
+  updateChatStatus();
+  scheduleNext();
+}
+
+// ═══════════════════════════════════════════
+// USER INPUT
+// ═══════════════════════════════════════════
+function handleWantsToSpeak() {
+  clearTimeout(appState.timer);
+  appState.wantsToSpeak = true;
+  if (!appState.isGenerating) showUserInputArea(true);
+  else document.getElementById("speak-btn").textContent = "⋯ 稍等，說完就換你";
+}
+
+function showUserInputArea(show) {
+  document.getElementById("user-input-area").style.display = show ? "flex" : "none";
+  document.getElementById("speak-btn").style.display = show ? "none" : "inline-flex";
+  document.getElementById("cancel-input-btn").style.display = show ? "inline-flex" : "none";
+  document.getElementById("speak-btn").textContent = "✎ 我要說話";
+  if (show) document.getElementById("user-input").focus();
+}
+
+function cancelInput() {
+  appState.wantsToSpeak = false;
+  showUserInputArea(false);
+  if (!appState.paused && appState.autoCount < 10) scheduleNext();
+}
+
+function sendUserMessage() {
+  const text = document.getElementById("user-input").value.trim();
+  if (!text || appState.isGenerating) return;
+  document.getElementById("user-input").value = "";
+  appState.wantsToSpeak = false;
+
+  const userMsg = {role:"user", message: text};
+  appState.messages.push(userMsg);
+  renderMessage(userMsg);
+
+  if (appState.mode === "group") showUserInputArea(false);
+
+  clearTimeout(appState.timer);
+  const nextId = appState.mode === "single"
+    ? appState.selectedWriters[0]
+    : appState.selectedWriters[appState.turnIndex % appState.selectedWriters.length];
+
+  setGenerating(true);
+  showTypingIndicator(nextId);
+
+  callAPI(nextId).then(msg => {
+    appendMessage(msg);
+    appState.turnIndex++;
+    setGenerating(false);
+    if (appState.mode === "single") {
+      setInputDisabled(false);
+    } else {
+      document.getElementById("speak-btn").style.display = "inline-flex";
+      document.getElementById("cancel-input-btn").style.display = "none";
+      if (appState.autoCount < 10) scheduleNext();
+    }
+  }).catch(() => {
+    removeTypingIndicator();
+    setGenerating(false);
+    if (appState.mode === "single") setInputDisabled(false);
+  });
+}
+
+document.getElementById("user-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey && !appState.isGenerating) { e.preventDefault(); sendUserMessage(); }
+});
+document.getElementById("user-input").addEventListener("input", e => {
+  document.getElementById("send-btn").disabled = !e.target.value.trim() || appState.isGenerating;
+});
+
+// ═══════════════════════════════════════════
+// API CALL
+// ═══════════════════════════════════════════
+async function callAPI(nextWriterId) {
+  const isSingle = appState.mode === "single";
+  const writers = appState.selectedWriters;
+  const topic = appState.topic;
+  const nextWriter = WRITERS[nextWriterId || writers[0]];
+  const allWriters = writers.map(id => WRITERS[id]);
+  const quoteRule = "名言彩蛋規則：可以偶爾使用該作家的知名短句或作品意象，但不要每次都引用，不要連續引用，不要大段引用原文。優先用角色的語氣與世界觀。";
+
+  const historyText = appState.messages.length === 0
+    ? "（尚無對話紀錄）"
+    : appState.messages.map(m => m.role === "user" ? `[你]: ${m.message}` : `[${WRITERS[m.writer]?.name || m.writer}]: ${m.message}`).join("\n");
+
+  let systemPrompt, userMessage;
+  if (isSingle) {
+    systemPrompt = `你是一個虛構文學角色對話生成器，純供娛樂用途。使用者正在和【${nextWriter.name}】進行一對一聊天。\n\n${nextWriter.name} 的角色設定：\n${nextWriter.persona}\n\n目前的對話紀錄：\n${historyText}\n\n你的任務：\n- 以【${nextWriter.name}】的身份回覆使用者最新的訊息。\n- 必須用繁體中文回覆。\n- 回覆像真實聊天，1-3句，自然有溫度。\n- 嚴格保持角色個性與語氣。\n- ${quoteRule}\n- 只輸出 JSON，格式：{"writer":"${nextWriter.id}","message":"..."}`;
+    userMessage = `請生成${nextWriter.name}的回覆，只輸出JSON。`;
+  } else {
+    systemPrompt = `你是一個虛構文學群組聊天生成器，純供娛樂用途。\n群組正在討論：「${topic}」\n\n群組成員：\n${allWriters.map(w => `【${w.name}】id:"${w.id}"\n${w.persona}`).join("\n\n")}\n\n下一位發言者：${nextWriter.name}（id:"${nextWriter.id}"）\n\n目前的對話紀錄：\n${historyText}\n\n你的任務：\n- 只寫【${nextWriter.name}】的下一則訊息。\n- 必須用繁體中文回覆。\n- 根據最新幾則訊息自然接話，如果有使用者發言，要優先回應。\n- 嚴格保持角色個性與說話風格。\n- ${quoteRule}\n- 長度：1-2句，絕對不超過3句。\n- 只輸出 JSON，格式：{"writer":"${nextWriter.id}","message":"..."}`;
+    userMessage = `請生成${nextWriter.name}的下一則訊息，只輸出JSON。`;
+  }
+
+  const resp = await fetch("/api/chat", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({systemPrompt, userMessage}),
+  });
+
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || `API error ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  if (!data.writer || !data.message) throw new Error("格式錯誤");
+  return {role:"writer", ...data};
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+initAvatarPicker();
+initHomePage();
+</script>
+</body>
+</html>
